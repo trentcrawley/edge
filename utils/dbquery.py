@@ -1,5 +1,7 @@
 from utils import connectdb
 import pandas as pd
+import psycopg2
+import psycopg2.extras
 
 def create_query(stocklist = [],table = 'asxminutedata', datefrom = '', dateto = '',limit=''):
     if len(stocklist) > 1:
@@ -48,5 +50,25 @@ def query_db_chunks(query ='select * from asxminutedata limit 10000000',chunksiz
     conn.close()
 
 
-#df = query_db(stocklist=['A2M','BHP'],datefrom='2020-01-01',dateto='2022-01-02')
+def querySignalDates(filterlist):
+    #once we have datetime ticker concat of relevant days we requery the db for just those days
+    query = """
+    select subquery.open,high,low,close,volume,value,count,datetime,ticker FROM (select *,concat(datetime::date,ticker) AS 
+    tempprimary from asxminutedata) AS subquery where subquery.tempprimary = ANY(%s); 
+    """
+    dbconn = connectdb.psycopg_connection()
+    dbconn.conn = dbconn.pgconnect()
+    colnames = ['open', 'high', 'low', 'close', 'volume', 'value', 'count', 'datetime', 'ticker']
+
+    x = dbconn.pgquery(dbconn.conn, query, (filterlist,))
+    df = pd.DataFrame(x, columns=colnames)
+    df['datetime'] = pd.to_datetime(df['datetime'], format = "%Y-%m-%d %H:%M:S")
+    df.set_index('datetime',inplace=True)
+    df = df.sort_values(by=['ticker', 'datetime'], ascending=[True, True])
+    df['date'] = df.index.date
+    df['time'] = df.index.time
+    df['value'] = pd.to_numeric(df['value'])
+    df['volume'] = pd.to_numeric(df['volume'])
+    #df = addfeat(df)
+    return df
 
