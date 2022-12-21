@@ -39,7 +39,6 @@ def query_db(stocklist = [],datefrom = '', dateto = '',table = 'asxminutedata',l
     conn.close()
     return df
 
-
 def query_db_chunks(query ='select * from asxminutedata limit 10000000',chunksize=5000000,
     conn=connectdb.create_db_connection()):
     '''loops through db and returns a chunk of data at a time''' 
@@ -48,7 +47,6 @@ def query_db_chunks(query ='select * from asxminutedata limit 10000000',chunksiz
         print(df)
 
     conn.close()
-
 
 def querySignalDates(filterlist):
     #once we have datetime ticker concat of relevant days we requery the db for just those days
