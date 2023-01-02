@@ -1,5 +1,7 @@
 from sqlalchemy import create_engine
 import json
+import psycopg2
+import psycopg2.extras
 
 def create_db_connection():
     f = open(r'C:\Users\trent\VSCode\edge\src\env\config.json')

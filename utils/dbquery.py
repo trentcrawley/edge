@@ -1,7 +1,7 @@
 from utils import connectdb
 import pandas as pd
-import psycopg2
-import psycopg2.extras
+# import psycopg2
+# import psycopg2.extras
 
 def create_query(stocklist = [],table = 'asxminutedata', datefrom = '', dateto = '',limit=''):
     if len(stocklist) > 1:

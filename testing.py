@@ -2,11 +2,9 @@ from utils.dbquery import query_db
 import pandas as pd
 from plotting.features import *
 
-df = query_db(['FMG','BHP'],datefrom='2020-01-01',dateto='2022-01-02')
-
-
-
-testsignal = [['vwap','rocvwap1','<',0],['9emaclose1min','rocema9close1min1','<',0]]
+# df = query_db(['FMG','BHP'],datefrom='2020-01-01',dateto='2022-01-02')
+# tf = query_db(datefrom='2021-07-01',dateto='2022-03-02')
+# testsignal = [['vwap','rocvwap1','<',0],['9emaclose1min','rocema9close1min1','<',0]]
 
 def add_required_features(df,signals,functionsMap):
     # add all required features to df
@@ -49,8 +47,9 @@ def get_signals(df,signals):
 
     return df
 
-df = add_required_features(df,testsignal,columnFeatureMap)
-print(df.columns)
-df = get_signals(df,testsignal)
-print(df)
-df.to_csv('test.csv')
+# df = add_required_features(df,testsignal,columnFeatureMap)
+# print(df.columns)
+# df = get_signals(df,testsignal)
+# print(df)
+# df.to_csv('test.csv')
+
