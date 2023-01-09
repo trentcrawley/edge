@@ -89,4 +89,7 @@ def getDates():
     return df, plotIds
 
 #plot and save to folder
+
+
+
 #pass queryDates to stockplot
