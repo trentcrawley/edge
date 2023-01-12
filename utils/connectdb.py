@@ -17,9 +17,9 @@ class psycopg_connection():
     def pgconnect(self):
         try:
             self.conn = psycopg2.connect(host='localhost',
-                                    database='asxdata',
+                                    database=data['db'][0]['database']',
                                     user='postgres',
-                                    password='Blacksmif6')
+                                    password=data['db'][0]['password'])
             print('connected')
         except Exception as e:
             print("unable to connect to the database")
