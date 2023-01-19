@@ -5,57 +5,12 @@ from plotly.subplots import make_subplots
 import datetime
 import os
 from tkinter.filedialog import askdirectory
-print(os.getcwd())
 from utils import getTestData
 import math
 import sigviz
 
 df,plotIds =  sigviz.getDates()
 plotIdTest = plotIds[:18]         
-
-def make_multiplots():
-    fig = make_subplots(
-    rows=4,
-    cols=3,
-    shared_xaxes="columns",
-    shared_yaxes="rows",
-    column_width=[0.3,0.3,0.3],
-    row_heights=[0.2,0.06,0.2,0.06],
-    horizontal_spacing=0,
-    vertical_spacing= 0, #[0,0.02,0,0.02],
-    subplot_titles=["Candlestick", "Price Bins", "Volume", ""]
-    )
-    return fig
-
-def add_trades(data,row,col):
-    fig.add_trace(
-    go.Candlestick(
-        x=data['plotdatetime'],
-        open=data['open'],
-        high=data['high'],
-        low=data['low'],
-        close=data['close'],
-        name='Price'
-    ),
-    row=row,
-    col=col
-    )
-
-    fig.add_trace(
-        go.Bar(
-            x=data['plotdatetime'],
-            y=data['volume'],
-            name='Volume'
-        ),
-        row=row+1,
-        col=col
-    )
-
-def saveFiles(self):
-        """
-        saves the plot as a png file
-        """
-        self.fig.write_image("plot.png")
 
 class StockPlot:
     """
@@ -214,11 +169,13 @@ class StockPlot:
             totalPlotCount =1
             currentPlotCount = 1
 
+            # get user input to determine output method
             self.outputMethod = input('Output to file or browser? (f/b)')
             if self.outputMethod == 'f':
                 Savedir = askdirectory()
                 fileName = input('Enter file name: ')
 
+            # 6 plots per page
             for pagecount in range(1,math.ceil(plotCount/(2 * 3))+1): #loop through all pages
                 plotTitleDict = {}
                 self.make_subplots_multiplot() #create figure object
@@ -236,6 +193,7 @@ class StockPlot:
 
                 self.update_multiplot_layout(plotTitleDict)
 
+                # output fig each page
                 if self.outputMethod == 'b':
                     self.fig.show()
                 else:
@@ -250,6 +208,3 @@ class StockPlot:
 plot = StockPlot(df,plotIds = plotIdTest)
 plot.sigviz(overlays = ['vwap','ema9close1min'])
 
-
-# TODO: 
-# 

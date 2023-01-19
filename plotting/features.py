@@ -19,6 +19,20 @@ def higherTimeFrame(df,time = 'D'):
     return grouped.dropna()
 
 
+# write a function to group dataframe by ticker and date then calculate the exponential moving average
+def ema(df,period = '20min',column = 'close'):
+    '''
+    period: period of ema, include min for minutes and D for days
+    if D need to use daily data
+    '''
+    df = df.copy()
+    colname = 'ema' + str(period) + column
+    if period[-3:].upper() == 'MIN':
+        period = int(period[:-3])
+    df.loc[:,colname] = df.groupby(['ticker',df.index.date])[column].transform(lambda x: x.ewm(span=period,min_periods=period).mean())
+    return df
+
+
 def gap(df):
     '''
     param df: dataframe with datetime index
@@ -29,9 +43,19 @@ def gap(df):
     daily = higherTimeFrame(data)
     daily = prevclose(daily)
     daily['gap'] = daily['open']/daily['prevdayclose'] - 1
+    daily['gapprice'] = daily['open'] - daily['prevdayclose']
     data = data.reset_index().merge(daily[['date','gap']]).set_index('datetime')
     return data
 
+def gapatr(df):
+    if 'gap' not in df.columns:
+        df = gap(df)
+    if 'atr' not in df.columns:
+        df = atr(df)
+
+    df['gapatr'] = df['gap'].abs()/df['atrpct']
+
+    return df
 
 
 def ma(df,period =[20],column = ['close'],time= ['1min'],type = ['sma']):
@@ -41,7 +65,8 @@ def ma(df,period =[20],column = ['close'],time= ['1min'],type = ['sma']):
         for i in period:
             for col in column:
                 for x in type:
-
+                    # naming convention sma20close1min
+                    # typeperiodcolumninterval
                     newcol  = x + str(i) + col + t
 
                     if t != '1min' and t !='D':
@@ -177,9 +202,10 @@ def spreadroc(df, spread = ['ANZ','WBC'],period= [10]):
         data['spreadroc'+str(i)] = data.groupby('date')[spread[0]+spread[1] +'close'].pct_change(i)
     return data
 
-def roc(df,period= [10],column ='close'):
-    for i in period:
-        df['roc'+ column + str(i)] = df.groupby(['date','ticker'])[column].pct_change(i)
+def roc(df,period= '10min',column ='close'):
+    colname = 'roc' + str(period) + column
+    period = int(period[:-3])
+    df.loc[:, colname] = df.groupby(['date','ticker'])[column].pct_change(period)
     return df
 
 def tyronestdev(df,period = 30):
@@ -193,50 +219,6 @@ def tyronestdev(df,period = 30):
 def barcount(df):
     df['barcount'] = df.groupby(['ticker','date']).cumcount()
     return df
-
-def addbarcount(df):
-    data = df.copy()
-    data['barcount'] = 0
-    barcountlist = []
-    prevcount =0
-
-    for row in data.itertuples():
-        if row.match =='opening match':
-            barcountlist.append(1)
-            prevcount =1
-
-        elif barcountlist[-1]>0:
-            barcountlist.append(prevcount +1 )
-            prevcount +=1
-        else:
-            barcountlist.append(0)
-
-    return barcountlist
-
-
-
-
-def addmatches(df):
-    #finds first non zero volume bar for each ticker and date
-    data = df.copy()
-    datanonzero = data[data['volume']!=0]
-    datanonzero.reset_index(inplace=True)
-    openmatchdf = datanonzero.groupby(['ticker',datanonzero.date])['datetime'].first().reset_index()
-    closingmatchdf = datanonzero.groupby(['ticker',datanonzero.date])['datetime'].last().reset_index()
-    openmatchdf['match'] = 'opening match'
-    closingmatchdf['match'] = 'closing match'
-    matchdf = pd.concat([openmatchdf,closingmatchdf])
-    matchdf.drop(columns = ['date'],inplace  = True)
-    data = pd.merge(data,matchdf,how ='left',left_on=['datetime','ticker'],right_on=['datetime','ticker'])
-    #add 10day average volume for opening match
-    openingmatchdf = data[data['match']=='opening match']
-    openingmatchdf['10dayavgopenvol'] = openingmatchdf.groupby('ticker')['volume'].transform(lambda x: x.rolling(10).mean())
-    openingmatchdf.reset_index(inplace=True)
-    openingmatchdf = openingmatchdf[['ticker','datetime','10dayavgopenvol']]
-    data = pd.merge(data,openingmatchdf,on = ['ticker','datetime'],how = 'left')
-    data.set_index('datetime',inplace = True)
-    return data
-
 
 def atr(df):
     tempdf = df.copy()
@@ -260,23 +242,28 @@ def atr(df):
 
 #create vwap feature
 def vwap(df):
-    df['vwap'] = df.groupby(['ticker',df.index.date])['value'].transform('cumsum')/df.groupby(['ticker',df.index.date])['volume']\
+    df.loc[:,'vwap'] = df.groupby(['ticker',df.index.date])['value'].transform('cumsum')/df.groupby(['ticker',df.index.date])['volume']\
     .transform('cumsum')
     return df
+
 #create average volume at time
-def avat(df):
-    df['avat5'] = df.groupby(['ticker',df.index.time])['volume'].transform(lambda x: round(x.rolling(5).mean(),0))
+def rvol(df):
+    '''
+    rvol for 5 days only, comes with averagevolattime and cumulative average volume at 
+    time for convience
+    '''
+    df['avat'] = df.groupby(['ticker',df.index.time])['volume'].transform(lambda x: round(x.rolling(5).mean(),0))
     #create cumulative volume at time
-    df['cavat5'] = df.groupby(['ticker',df.index.date])['avat5'].transform('cumsum')
-    df['rvol5'] = df.groupby(['ticker',df.index.date])['volume'].transform('cumsum')/df['cavat5']
-    df['ravat5'] = df['volume']/df['avat5']
+    df['cavat'] = df.groupby(['ticker',df.index.date])['avat'].transform('cumsum')
+    df['rvol'] = df.groupby(['ticker',df.index.date])['volume'].transform('cumsum')/df['cavat']
+    df['ravat'] = df['volume']/df['avat']
     return df
 
 def cumval(df):
     df['cumval'] = df.groupby(['date','ticker'])['value'].transform(lambda x: x.expanding().sum())
     return df
 
-def rvolDelta(df):
+def rvoldelta(df):
     df['priorRvol'] =df.groupby(['date','ticker'])['rvol5'].shift(15)
     df['rvolDelta'] = df['rvol5']/df['priorRvol']
     df.drop(columns=['priorRvol'],inplace=True)

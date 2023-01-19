@@ -14,12 +14,21 @@ def create_db_connection():
     return conn
 
 class psycopg_connection():
+
+    def __init__(self):
+        f = open(r'C:\Users\trent\VSCode\edge\src\env\config.json')
+        self.data = json.load(f)
+        f.close()
+        self.conn = None
+        self.password = self.data['db'][0]['password']
+        self.database = self.data['db'][0]['database']
+
     def pgconnect(self):
         try:
             self.conn = psycopg2.connect(host='localhost',
-                                    database=data['db'][0]['database']',
+                                    database=self.database,
                                     user='postgres',
-                                    password=data['db'][0]['password'])
+                                    password=self.password)
             print('connected')
         except Exception as e:
             print("unable to connect to the database")

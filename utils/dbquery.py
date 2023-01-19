@@ -57,8 +57,7 @@ def querySignalDates(filterlist):
     dbconn = connectdb.psycopg_connection()
     dbconn.conn = dbconn.pgconnect()
     colnames = ['open', 'high', 'low', 'close', 'volume', 'value', 'count', 'datetime', 'ticker']
-
-    x = dbconn.pgquery(dbconn.conn, query, (filterlist,))
+    x = dbconn.pgquery(dbconn.conn,query, (filterlist,))
     df = pd.DataFrame(x, columns=colnames)
     df['datetime'] = pd.to_datetime(df['datetime'], format = "%Y-%m-%d %H:%M:S")
     df.set_index('datetime',inplace=True)
@@ -69,4 +68,5 @@ def querySignalDates(filterlist):
     df['volume'] = pd.to_numeric(df['volume'])
     #df = addfeat(df)
     return df
+
 
