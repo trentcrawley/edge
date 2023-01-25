@@ -7,10 +7,10 @@ import os
 from tkinter.filedialog import askdirectory
 from utils import getTestData
 import math
-import sigviz
+#import sigviz
 
-df,plotIds =  sigviz.getDates()
-plotIdTest = plotIds[:18]         
+# df,plotIds =  sigviz.getDates()
+# plotIdTest = plotIds[:18]         
 
 class StockPlot:
     """
@@ -205,6 +205,6 @@ class StockPlot:
             raise Exception('plotIds not defined')
  
 
-plot = StockPlot(df,plotIds = plotIdTest)
-plot.sigviz(overlays = ['vwap','ema9close1min'])
+# plot = StockPlot(df,plotIds = plotIdTest)
+# plot.sigviz(overlays = ['vwap','ema9close1min'])
 

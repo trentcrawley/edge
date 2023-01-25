@@ -11,7 +11,7 @@ def create_db_connection():
     database = data['db'][0]['database']
     engine = create_engine('postgresql://postgres:' + password + '@localhost:5432/' + database)
     conn = engine.connect().execution_options(stream_results=True)
-    return conn
+    return engine,conn
 
 class psycopg_connection():
 

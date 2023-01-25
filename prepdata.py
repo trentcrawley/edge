@@ -2,12 +2,6 @@ from utils.dbquery import query_db
 import pandas as pd
 from plotting.features import *
 
-testSignal = [{'sequential': {'10min':[
-    [{'ema':['10min','close']}, {'roc':['1min']}, '<', 0],
-    [{'vwap':[None]}, {'roc':['1min']}, '<', 0],
-    [{'vwap':[None]}, {'value':[None]}, '<', {'ema':['9min','close']}]
-]}}]
-
 def add_all_features(df,signals):
     """ e.g.
     testSignal = [{'sequential': {'10min':[
@@ -130,7 +124,7 @@ def get_signals(df, signals):
                     else:
                         condstring = cond_col
 
-                    print(f'getting signal: {value_col} {str(signal[2])} {condstring}')
+                    #print(f'getting signal: {value_col} {str(signal[2])} {condstring}')
 
                     if signal[2] == '<':
                         df['signal'] = np.where(value < cond,1,0) * df['signal']

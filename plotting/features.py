@@ -39,21 +39,21 @@ def gap(df):
     return: dataframe with gap column
 
     ''' 
-    data = df.copy()
-    daily = higherTimeFrame(data)
-    daily = prevclose(daily)
-    daily['gap'] = daily['open']/daily['prevdayclose'] - 1
-    daily['gapprice'] = daily['open'] - daily['prevdayclose']
-    data = data.reset_index().merge(daily[['date','gap']]).set_index('datetime')
-    return data
+    df = df.copy()
+    df['prevdayclose'] = df.groupby('ticker')['close'].shift(1)
+    df['gap'] = df['open']/df['prevdayclose'] - 1
+    df['gapdollars'] = df['open'] - df['prevdayclose']
+    df.drop(columns = 'prevdayclose',inplace=True)
+    return df
 
 def gapatr(df):
+    df = df.copy()
     if 'gap' not in df.columns:
         df = gap(df)
     if 'atr' not in df.columns:
         df = atr(df)
-
-    df['gapatr'] = df['gap'].abs()/df['atrpct']
+        
+    df['gapatr'] = df['gapdollars'].abs()/df['atr']
 
     return df
 
@@ -105,29 +105,26 @@ def ma(df,period =[20],column = ['close'],time= ['1min'],type = ['sma']):
 
     return data
 
-def bollinger(df,n=20,k=2,time = 'D'):
-    data = df.copy()
-    #only setup to take daily - will likely never use bollinger intraday
-    colcheck = f'sma{n}close{time}'
 
-    if colcheck not in data.columns:
-        data = ma(df=data,period = [n],time = [time])
-
-    grouped = higherTimeFrame(data, time)[['ticker', 'date', 'close']].dropna()
-
-
-    grouped.drop(columns=col, inplace=True)
-    data = data.reset_index().merge(grouped, on=['date', 'ticker'], how='left').set_index(
-        'datetime')
-
-
-    df['bollmid'] = df[colcheck]
+def bollinger(df,n=20,k=2):
+    df['bollmid'] = df.groupby('ticker')['close'].transform(lambda x: x.rolling(n).mean())
     df['bollup'] = df.groupby('ticker')['bollmid'].transform(lambda x: x.rolling(n).std() * k) + df['bollmid']
-    df['bolldown'] =df.groupby('ticker')['bollmid'].transform(lambda x: x.rolling(n).std() * k) - df['bollmid']
+    df['bolldown'] =df.groupby('ticker')['bollmid'].transform(lambda x: x.rolling(n).std() * k)*-1 + df['bollmid']
     return df
 
+def bollup(df,n=20,k=2):
+    if 'bollmid' not in df.columns:
+        df['bollmid'] = df.groupby('ticker')['close'].transform(lambda x: x.rolling(n).mean())
+    df['bollup'] = df.groupby('ticker')['bollmid'].transform(lambda x: x.rolling(n).std() * k) + df['bollmid']
+    return df
 
+def bolldown(df,n=20,k=2):
+    if 'bollmid' not in df.columns:
+        df['bollmid'] = df.groupby('ticker')['close'].transform(lambda x: x.rolling(n).mean())
+    df['bolldown'] =df.groupby('ticker')['bollmid'].transform(lambda x: x.rolling(n).std() * k)*-1 + df['bollmid']
+    return df
 
+def turnover():
     data = getsharesout()
     df['date'] = pd.to_datetime(df['date'])
     df = df.merge(data.reset_index(), on=['date', 'ticker'], how='inner')
@@ -221,24 +218,15 @@ def barcount(df):
     return df
 
 def atr(df):
-    tempdf = df.copy()
-    if 'daychg' not in tempdf.columns:
-        tempdf = prevclose(tempdf)
-    grouped = tempdf.groupby('ticker').resample('D').agg(
-        {'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'prevdayclose': 'last',
-         'date': 'last'}).dropna().reset_index(level=0)
-    grouped['high_low'] = grouped['high'] - grouped['low']
-    grouped['high_close'] = np.abs(grouped['high'] - grouped['prevdayclose'])
-    grouped['low_close'] = np.abs(grouped['low'] - grouped['prevdayclose'])
-    grouped['true_range'] = grouped[['high_low', 'high_close', 'low_close']].values.max(1)
-    grouped['atr'] = grouped.groupby('ticker')['true_range'].transform(lambda x: x.rolling(10).sum() / 10)
-
-    atrdf = grouped[['date', 'ticker', 'atr']]
-    tempdf = tempdf.reset_index().merge(atrdf, on=['date', 'ticker'], how='left').set_index('datetime')
-    tempdf['atrpct'] = tempdf['atr'] / tempdf['close']
-    tempdf['atrrel'] = tempdf['daychg'].abs() / tempdf['atrpct']
-    #tempdf.drop(columns=['atrpct'], inplace=True)
-    return tempdf
+    df = df.copy()
+    df['prevdayclose'] = df.groupby('ticker')['close'].shift(1)
+    df['high_low'] = df['high'] - df['low']
+    df['high_close'] = np.abs(df['high'] - df['prevdayclose'])
+    df['low_close'] = np.abs(df['low'] - df['prevdayclose'])
+    df['true_range'] = df[['high_low', 'high_close', 'low_close']].values.max(1)
+    df['atr'] = df.groupby('ticker')['true_range'].transform(lambda x: x.rolling(10).sum() / 10)
+    df.drop(columns = ['prevdayclose','high_low','high_close','low_close','true_range'],inplace = True)
+    return df
 
 #create vwap feature
 def vwap(df):
