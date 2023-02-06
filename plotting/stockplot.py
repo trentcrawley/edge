@@ -58,9 +58,7 @@ class StockPlot:
         )
 
     def add_traces_multiplot(self,data,row,col,overlays = []):
-        # temp force only one signal
-        data['signal'] = 0
-        data['signal'].iloc[50] =1
+
         if row ==1 and col==1: #only display legend for first plot to avoid repetition
             displayLegend = True
         else:
@@ -103,7 +101,7 @@ class StockPlot:
                     )
                     colors.pop(0)
                 else:
-                    print("overlay {overlay} not available")
+                    print(f"overlay {overlay} not available")
 
         self.fig.add_trace(
             #add volume to second axis
@@ -122,19 +120,19 @@ class StockPlot:
         #Add signals to plot as verticl line
         signaldf = data[data['signal']==1]
         if not signaldf.empty:
-            for index, line in signaldf.iterrows():
+            #for index, line in signaldf.iterrows():
                 
-                self.fig.add_shape(
-                    dict(
-                        type='line',
-                        yref = 'y', y0 =ybottom,y1=ytop,
-                        xref = 'x', x0 = line['plotdatetime'],x1=line['plotdatetime'],
-                        line=dict(color='white',width =1),
-                        ),
-                     row=row,
-                     col=col,
-                     secondary_y=False
-                )
+            self.fig.add_shape(
+                dict(
+                    type='line',
+                    yref = 'y', y0 =ybottom,y1=ytop,
+                    xref = 'x', x0 = signaldf['plotdatetime'].iloc[0],x1=signaldf['plotdatetime'].iloc[0],
+                    line=dict(color='red',width =1),
+                    ),
+                    row=row,
+                    col=col,
+                    secondary_y=False
+            )
           
     def update_multiplot_axes(self,row,col):
         self.fig.update_xaxes(dtick =60, row=row, col=col,rangeslider_visible=False,
@@ -183,8 +181,12 @@ class StockPlot:
                     for col in range(1,4):
                         filteredDf = self.plotDf[self.plotDf['primarykey'].isin(self.plotIds[self.plotIds['plotId'] == totalPlotCount]['primarykey'])] #filter df for each plot
                         if not filteredDf.empty:
-                            plotTitleDict['Plot '+ str(currentPlotCount)] = str(filteredDf.iloc[0]['ticker']) + " " + str(filteredDf.iloc[0]['date'])
-                            self.add_traces_multiplot(filteredDf,row,col,overlays) #add price and volume traces
+                            if filteredDf['signal'].sum()>0:
+                                titleString = str(filteredDf[filteredDf['signal']==1].iloc[0]['ticker']) + " " + str(filteredDf[filteredDf['signal']==1].iloc[0]['date'])
+                                plotTitleDict['Plot '+ str(currentPlotCount)] = titleString
+                                self.add_traces_multiplot(filteredDf,row,col,overlays) #add price and volume traces
+                            else:
+                                plotTitleDict['Plot '+ str(currentPlotCount)] = ''
                         else:
                             plotTitleDict['Plot '+ str(currentPlotCount)] = ''
                         totalPlotCount +=1

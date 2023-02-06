@@ -2,10 +2,14 @@ import pandas as pd
 import numpy as np
 import itertools
 import datetime
+from utils.getTestData import getTestDataCsv
+
+df = getTestDataCsv(daily=True)
 
 '''
 All functions take a dataframe and return a dataframe with features added
 Input should always should have datetime index and datetime index in returned dataframe
+function name should be same as column name, if has args should colname==funcname+args in order
 
 '''
 
@@ -18,6 +22,11 @@ def higherTimeFrame(df,time = 'D'):
 
     return grouped.dropna()
 
+def firstbarrng(df):
+    if 'barcount' not in df.columns:
+        df = barcount(df)
+    df['firstbarrng'] = (df[df['barcount'] == 0]['close'] / df[df['barcount'] == 0]['open']) - 1
+    return df
 
 # write a function to group dataframe by ticker and date then calculate the exponential moving average
 def ema(df,period = '20min',column = 'close'):
@@ -53,7 +62,7 @@ def gapatr(df):
     if 'atr' not in df.columns:
         df = atr(df)
         
-    df['gapatr'] = df['gapdollars'].abs()/df['atr']
+    df['gapatr'] = df['gapdollars']/df['atr']
 
     return df
 
@@ -181,8 +190,6 @@ def maResponse(df):
 
     return df
 
-
-
 def pctbelowma(df,ma = ['ema20close1min'],period = 15):
     for line in ma:
         df['below' + line] = np.where(df['close']<=df[line],1,0)
@@ -226,6 +233,27 @@ def atr(df):
     df['true_range'] = df[['high_low', 'high_close', 'low_close']].values.max(1)
     df['atr'] = df.groupby('ticker')['true_range'].transform(lambda x: x.rolling(10).sum() / 10)
     df.drop(columns = ['prevdayclose','high_low','high_close','low_close','true_range'],inplace = True)
+    return df
+
+def atrmultiday(df, days = 4):
+    '''
+    atr mutliple from look back period
+    '''
+    df = df.copy()
+    days = int(days)
+    df['refclose'] = df.groupby('ticker')['close'].shift(days)
+    df['multidaymove'] = df['open'] - df['refclose']
+    df['atrmultiday'+str(days)] = df['multidaymove']/df['atr']
+    df.drop(columns = ['refclose','multidaymove'],inplace = True)
+    return df
+
+def atrpct(df):
+    '''
+    atr as a percentage of close
+    '''
+    if 'atr' not in df.columns:
+        df = atr(df)
+    df['atrpct'] = df['atr'].abs()/df['close']
     return df
 
 #create vwap feature
@@ -356,6 +384,18 @@ def spread(df,ticker:list,vals = ['close','volume']):
 
 
     return spreaddf
+
+def dayopenopen(df):
+    df['dayopenopen'] = df.groupby(['ticker','date'])['open'].transform('first')
+    return df
+
+def dayopenlow(df):
+    '''
+    low of first bar
+    '''
+    df['dayopenlow'] = df.groupby(['ticker','date'])['low'].transform('first')
+    return df
+
 
 def sharesout(df):
 

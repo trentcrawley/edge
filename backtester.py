@@ -1,14 +1,8 @@
 import numpy as np
 import pandas as pd
-import features as ft
-import connectdb
+from plotting import features as ft
 import datetime
-import stockplot as sp
-import plotly.express as px
-import matplotlib.pyplot as plt
 pd.options.mode.chained_assignment = None
-
-Backtester()
 
 class Backtester():
 
@@ -39,6 +33,10 @@ class Backtester():
 
         if 'datetime' in self.dataframe.columns:
             self.dataframe.set_index('datetime',inplace=True)
+        
+        if 'sell' or 'buy' not in self.dataframe['signal'].unique():
+            self.dataframe['signal'] = np.where(self.dataframe['signal'] == 1, 'sell', '')
+            print('signal not defined as buy or sell, setting to sell')
 
     def sortData(self,df):
         df.sort_values(by = ['datetime','ticker'],inplace=True)

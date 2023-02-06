@@ -4,41 +4,56 @@ import pandas as pd
 from prepdata import add_all_features, get_signals
 import datetime
 from datetime import timedelta
-
-
-# testSignalInput = [{'sequential': {'10min':[
-#     [{'ema':['9min','close']}, {'roc':['1min']}, '<', 0],
-#     [{'vwap':[None]}, {'roc':['1min']}, '<', 0],
-#     [{'vwap':[None]}, {'value':[None]}, '<', {'ema':['9min','close']}]
-# ]}}]
+from plotting import stockplot
+from backtester import Backtester
 
 minuteSignalInput = [{'sequential': {'10min':[
-    [{'rvol':[None]}, {'value':[None]}, '>', 1.5],
-    [{'rvol':[None]}, {'roc':['10min']}, '>', 0.2],
-    [{'barcount':[None]}, {'value':[None]}, '>', 10],
+    [{'barcount':[None]}, {'value':[None]}, '<', 20],
+    [{'rvol':[None]}, {'value':[None]}, '>', 1.2],
+    [{'cumval':[None]}, {'value':[None]}, '>', 200000],
+    [{'close':[None]}, {'value':[None]}, '<', {'vwap':[None]}],
+    [{'vwap':[None]}, {'roc':['1min']}, '<', 0],
+    [{'close':[None]}, {'value':[None]}, '<', {'dayopenlow':[None]}]
     ]}}]
+
+
+# minuteSignalInput = [{'sequential': {'10min':[
+#     [{'rvol':[None]}, {'value':[None]}, '>', 0.8],
+#     [{'barcount':[None]}, {'value':[None]}, '<', 15],
+#     [{'firstbarrng':[None]}, {'value':[None]}, '<', -0.0015],
+#     [{'cumval':[None]}, {'value':[None]}, '>', 300000],
+#     ]}}]
+#[{'vwap':[None]}, {'roc':['1min']}, '<', 0]
 
 dailySignalInput = [{'sequential': {'daily':[
-    [{'bollinger':[None]}, {'bollup':[None]}, '<', 100,],
-    [{'gapatr':[None]}, {'value':[None]}, '>', 1.5]
+    [{'open':[None]}, {'value':[None]}, '>',{'bollup':[None]}],
+    [{'gapatr':[None]}, {'value':[None]}, '>', 1.5],
+    [{'close':[None]}, {'value':[None]}, '>', 0.5],
+    [{'atrpct':[None]}, {'value':[None]}, '>', 0.015],
     ]}}]
 
-
-
+#[{'atrmultiday':['4']}, {'value':[None]}, '>', 3],
+#[{'rvol':[None]}, {'roc':['5min']}, '>', 0.1],
+#[{'rvol':[None]}, {'value':[None]}, '>', 0.5],
 #df = getTestData.getTestDataCsv(daily = True)
 
 
-# TODO: need to handle daily data, for daily use asxdailydata database.
-# Need to make sure feature functions compaitble with this new format
+# TODO: 
 # Add functions to handle sequential
 # make days before handle weekends
+# only display first signal
+# figure out why signal displaying for some days after real signal
 
-#Daily - 
-# add atr function
-# create function to filter for daily then do minutely.
+# is small issue where feature function doesn't care acount which days it groups, so if stock halted
+# will use data pre halt on batch feature, then on precision database call will not have enough
+# data as stock halted immediately prior to signal.
 
-def get_signal_dates(signals,query ='select * from asxminutedata limit 100000',chunksize=5000000,
-    daysbefore = 7,daysafter = 1,params = None):
+# fix backtester and test
+# convert alert to vscode/ ib_insync
+
+
+def get_signal_dates(signals,query ='select * from asxminutedata order by (ticker,datetime) limit 100000',chunksize=5000000,
+    daysbefore = 7,daysafter = 1,daysbeforeplot = 1, daysafterplot = 1,params = None,signalDaily = None):
     '''loops through db and returns a chunk of data at a time. adds features and 
     adds signals, then generates signalsdf. gets all unique ticker date and assigns 
     plotIds''' 
@@ -51,15 +66,29 @@ def get_signal_dates(signals,query ='select * from asxminutedata limit 100000',c
             print(f'getting chunk {counter}')
             df['date'] = df.index.date
             df['time'] = df.index.time
+            df.sort_values(by=['ticker','date'],inplace=True)
             #add features
+            #needs days before to calc certain features
             df,signals_new = add_all_features(df,signals)# signals_new adds transform column name
+            # if 'LDR' in df['ticker'].values:
+            #     df[df['ticker']=="LDR"].to_csv('LDRtestfeat.csv')
             print('adding features')
             #add signals
-            df = get_signals(df,signals_new)
-            print('adding signals')
-            if df.signal.sum() > 0:
-                signaldf = pd.concat([signaldf,df[df['signal']==1]],axis=0,ignore_index=True)# concat signals
-            counter+=1
+            # need to filter the data to only include daily signals if daily specified
+            if signalDaily:
+                df['primarykey'] = df['date'].astype(str) + df['ticker']
+                df = df[df['primarykey'].isin(signalDaily)]
+
+            if not df.empty:
+                df = get_signals(df,signals_new)
+                # if 'LDR' in df['ticker'].values:
+                #     if df[df['ticker']=="LDR"]['signal'].sum()>0:
+                #         df[df['ticker']=="LDR"].to_csv('LDRtest.csv')
+
+                print('adding signals')
+                if df.signal.sum() > 0:
+                    signaldf = pd.concat([signaldf,df[df['signal']==1]],axis=0,ignore_index=True)# concat signals
+                counter+=1
 
         engine.dispose()
         conn.close()
@@ -72,72 +101,101 @@ def get_signal_dates(signals,query ='select * from asxminutedata limit 100000',c
         
 
     def get_unique_ticker_dates(signals):
-        dayDict = {'date': [], 'ticker': [],'plotId':[]}
-        plotId = 1
+        dayDict = {'date': [], 'ticker': []}
+        
         for row in signals.itertuples():
             startDate = row.date + datetime.timedelta(-daysbefore)
             endDate = row.date + datetime.timedelta(daysafter)
             daysbetween = endDate - startDate
             
-
             for days in range(daysbetween.days + 1):
                 current_date = startDate + datetime.timedelta(days)
                 if current_date.weekday() < 5:
                     dayDict['date'].append(current_date)
                     dayDict['ticker'].append(row.ticker)
-                    dayDict['plotId'].append(plotId)
-        
-            plotId+=1
             
         dayids = pd.DataFrame(dayDict)
-        plotIds = dayids
-        plotIds['primarykey'] = plotIds['date'].astype(str) + plotIds['ticker']
-
         dayids.drop_duplicates(inplace=True)
 
-        queryDates = list(dayids['date'].astype(str) + dayids['ticker'])
+        plotDict = {'date': [], 'ticker': [],'plotId':[]}
+        plotId = 1
+        for row in signals.itertuples():
+            startDate = row.date + datetime.timedelta(-daysbeforeplot)
+            endDate = row.date + datetime.timedelta(daysafterplot)
+            daysbetween = endDate - startDate
 
-        return queryDates,plotIds
+            for days in range(daysbetween.days + 1):
+                current_date = startDate + datetime.timedelta(days)
+                if current_date.weekday() < 5:
+                    plotDict['date'].append(current_date)
+                    plotDict['ticker'].append(row.ticker)
+                    plotDict['plotId'].append(plotId)
+            
+            plotId+=1
+
+        plotIds = pd.DataFrame(plotDict)
+        plotIds['primarykey'] = plotIds['date'].astype(str) + plotIds['ticker']
+        plotIds.drop_duplicates(inplace=True)
+
+        queryDates = list(dayids['date'].astype(str) + dayids['ticker']) #sigdate + dates either side
+        signalDates = list(signals['date'].astype(str) + signals['ticker']) # just sig dates same format as queryDates
+
+        return queryDates,plotIds,signalDates
     
     signals = get_all_signals()
     
     if signals is not None:
-        queryDates,plotIds = get_unique_ticker_dates(signals)
+        queryDates,plotIds,signalDates = get_unique_ticker_dates(signals)
         numberOfDays = plotIds['plotId'].max()
         print(f'signals found for {numberOfDays} days')
-        return queryDates,plotIds
+        return queryDates,plotIds,signalDates
     else:
         print('no signals found')
-        return None
+        return None,None,None
 
 def getDates():
     if dailySignalInput:
         # get daily signal dates
-        queryDates,plotIds = get_signal_dates(dailySignalInput,query='select * from asxdailydata')#get all unique ticker,date combinations for requested dates 
+        print('filtering by daily signals')
+        queryDates,plotIds,signalDates = get_signal_dates(dailySignalInput,query='select * from asxdailydata order by (ticker,datetime)')#get all unique ticker,date combinations for requested dates 
         # get only dates from queryDates
         query = """
                 WITH temp AS (
-                    select *, concat(datetime::date,ticker) as datetimeticker from asxminutedata
+                    select *, concat(datetime::date,ticker) as datetimeticker from asxminutedata order by (ticker,datetime) 
                 )
-                SELECT * FROM temp WHERE datetimeticker = any(%(queryDates)s);
+                SELECT * FROM temp WHERE datetimeticker = any(%(queryDates)s) ;
                 """
-
-        queryDates,plotIds = get_signal_dates(minuteSignalInput,query=query,params = {'queryDates':queryDates})#get all unique ticker,date combinations for requested dates 
+        print('filtering by minute signals')
+        queryDates,plotIds,signalDates = get_signal_dates(minuteSignalInput,query=query,params = {'queryDates':queryDates},signalDaily = signalDates)#get all unique ticker,date combinations for requested dates 
 
     else:
-        queryDates,plotIds = get_signal_dates(minuteSignalInput,query='select * from asxdailydata limit 100000')#get all unique ticker,date combinations for requested dates 
+        queryDates,plotIds,signalDates = get_signal_dates(minuteSignalInput,query='select * from asxminutedata limit 100000 order by (ticker,datetime)')#get all unique ticker,date combinations for requested dates 
     #now use query dates as filter for minute signals.
     
     
     
-    #df = dbquery.querySignalDates(queryDates1)#re-query for these days
-    # df,new_signals = add_all_features(df,testSignalInput)#re-add features
-    # df = get_signals(df,new_signals)#re-add signals
-    return plotIds, queryDates
+    df = dbquery.querySignalDates(queryDates)#re-query for these days
+    df,new_signals = add_all_features(df,minuteSignalInput)#re-add features, need new signals because orig has been updated in first loop
+    df = get_signals(df,new_signals)#re-add signals
+    return df, plotIds, queryDates
 
-plotIds,queryDates = getDates()
+df, plotIds,queryDates = getDates()
 
-plotIds.to_csv('test.csv')
+plot = stockplot.StockPlot(df,plotIds = plotIds)
+plot.sigviz(overlays = ['vwap'])
+
+# print("done")
+
+
+# btest = Backtester(df)
+
+# print('yes')
+#plotIds.to_csv('test.csv')
+
+
+
+# import importlib
+# importlib.reload(features)
 # engine,conn = connectdb.create_db_connection()
 # params = queryDates
 # chunksize = 1000000
@@ -166,13 +224,3 @@ plotIds.to_csv('test.csv')
 #     print(chunk)
 
 
-
-
-
-
-
-# 
-
-
-# TODO: need to add ability to say some condition has happened in past x periods.
-# Add ability to first filter on daily data, then filter on minute data.
